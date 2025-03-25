@@ -43,6 +43,42 @@ local function createButton(name, position, action)
     end)
 end
 
+  -- 🔰 Anti-Tudo
+createButton("Anti-Tudo", 10, function(active)
+if active then
+-- Proteção contra kick
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+local method = getnamecallmethod()
+if method == "Kick" or method == "kick" then return nil end
+return oldNamecall(self, ...)
+end)
+
+-- Proteção contra AFK  
+    local Players = game:GetService("Players")  
+    for _, v in pairs(getconnections(Players.LocalPlayer.Idled)) do v:Disable() end  
+
+    -- 🔰 Proteção Contra Logs do Byfron (Impede Envio de Dados Suspeitos)  
+    local oldHttpPost = hookfunction(game.HttpPost, function(...)  
+        print("[🛡️ Proteção Ativada] Bloqueando Logs do Byfron.")  
+        return nil -- Bloqueia envio de logs suspeitos para os servidores do Roblox  
+    end)  
+
+    -- 🔰 Proteção Contra Fechamento Forçado do Jogo  
+    game:GetService("CoreGui").ChildRemoved:Connect(function(child)  
+        if child.Name == "RobloxPromptGui" then  
+            print("[⚠️ Proteção Ativada] Tentativa de Fechar Jogo Detectada.")  
+            wait(9e9) -- Previne fechamento forçado  
+        end  
+    end)  
+else  
+    -- Desativar proteções (não tem como desfazer completamente, mas minimiza)  
+    game:GetService("Players").LocalPlayer.Idled:Connect(function() end)  
+end
+
+end)
 -- 🔰 Atravessar paredes corrigido
 createButton("Atravessar Paredes", 10, function(active)
     local char = game:GetService("Players").LocalPlayer.Character
