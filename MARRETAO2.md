@@ -8,7 +8,7 @@ FloatingButton.Text = "SCRIPT"
 FloatingButton.BackgroundColor3 = Color3.fromRGB(0, 0, 255)
 
 local Panel = Instance.new("Frame", ScreenGui)
-Panel.Size = UDim2.new(0, 200, 0, 200)
+Panel.Size = UDim2.new(0, 200, 0, 240) -- Ajustei o tamanho para caber todos os botões
 Panel.Position = UDim2.new(0.75, 0, 0.1, 0)
 Panel.Visible = false
 Panel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
@@ -43,60 +43,70 @@ local function createButton(name, position, action)
     end)
 end
 
--- 🔰 Proteção contra Kick (Bloqueia Tentativas de Kick)
-local mt = getrawmetatable(game)
-setreadonly(mt, false)
+-- 🔰 Anti-Tudo (Proteções)
+local antiTudoAtivo = false
 
-local oldNamecall = mt.__namecall
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if method == "Kick" or method == "kick" then
-        print("[⚠️ Proteção Ativada] Tentativa de Kick bloqueada.")
-        return nil -- Cancela qualquer tentativa de Kick
+createButton("ANTI-TUDO", 10, function(active)
+    antiTudoAtivo = active
+    if antiTudoAtivo then
+        -- Proteção contra Kick
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+
+        local oldNamecall = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            if method == "Kick" or method == "kick" then
+                print("[⚠️ Proteção Ativada] Tentativa de Kick bloqueada.")
+                return nil -- Cancela qualquer tentativa de Kick
+            end
+            return oldNamecall(self, ...)
+        end)
+
+        -- Proteção contra Banimento Automático (Desativa detecção de AFK/Inatividade)
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        local function DisableBan()
+            for _, v in pairs(getconnections(LocalPlayer.Idled)) do
+                v:Disable() -- Impede detecção por inatividade
+            end
+            print("[🛡️ Proteção Ativada] Detector de Inatividade Desativado.")
+        end
+        DisableBan()
+
+        -- Bypass do Byfron Anti-Cheat (Impedindo Detecção)
+        local oldIndex = mt.__index
+        mt.__index = newcclosure(function(self, key)
+            if key == "PreloadAsync" or key == "InvokeServer" or key == "Kick" then
+                print("[⚠️ Proteção Ativada] Tentativa de Detecção do Byfron Bloqueada.")
+                return function(...) return nil end -- Cancela qualquer tentativa de detecção
+            end
+            return oldIndex(self, key)
+        end)
+
+        -- Proteção Contra Logs do Byfron (Impede Envio de Dados Suspeitos)
+        local oldHttpPost = hookfunction(game.HttpPost, function(...)
+            print("[🛡️ Proteção Ativada] Bloqueando Logs do Byfron.")
+            return nil -- Bloqueia envio de logs suspeitos para os servidores do Roblox
+        end)
+
+        -- Proteção Contra Fechamento Forçado do Jogo
+        game:GetService("CoreGui").ChildRemoved:Connect(function(child)
+            if child.Name == "RobloxPromptGui" then
+                print("[⚠️ Proteção Ativada] Tentativa de Fechar Jogo Detectada.")
+                wait(9e9) -- Previne fechamento forçado
+            end
+        end)
+
+        print("[✅] Proteção Máxima Ativada: Anti-Kick, Anti-Ban, Byfron Bypass!")
+    else
+        print("[⚠️] Proteção Desativada!")
     end
-    return oldNamecall(self, ...)
 end)
-
--- 🔰 Proteção contra Banimento Automático (Desativa detecção de AFK/Inatividade)
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local function DisableBan()
-    for _, v in pairs(getconnections(LocalPlayer.Idled)) do
-        v:Disable() -- Impede detecção por inatividade
-    end
-    print("[🛡️ Proteção Ativada] Detector de Inatividade Desativado.")
-end
-DisableBan()
-
--- 🔰 Bypass do Byfron Anti-Cheat (Impedindo Detecção)
-local oldIndex = mt.__index
-mt.__index = newcclosure(function(self, key)
-    if key == "PreloadAsync" or key == "InvokeServer" or key == "Kick" then
-        print("[⚠️ Proteção Ativada] Tentativa de Detecção do Byfron Bloqueada.")
-        return function(...) return nil end -- Cancela qualquer tentativa de detecção
-    end
-    return oldIndex(self, key)
-end)
-
--- 🔰 Proteção Contra Logs do Byfron (Impede Envio de Dados Suspeitos)
-local oldHttpPost = hookfunction(game.HttpPost, function(...)
-    print("[🛡️ Proteção Ativada] Bloqueando Logs do Byfron.")
-    return nil -- Bloqueia envio de logs suspeitos para os servidores do Roblox
-end)
-
--- 🔰 Proteção Contra Fechamento Forçado do Jogo
-game:GetService("CoreGui").ChildRemoved:Connect(function(child)
-    if child.Name == "RobloxPromptGui" then
-        print("[⚠️ Proteção Ativada] Tentativa de Fechar Jogo Detectada.")
-        wait(9e9) -- Previne fechamento forçado
-    end
-end)
-
-print("[✅] Proteção Máxima Ativada: Anti-Kick, Anti-Ban e Byfron Bypass!")
 
 -- ✈️ Voar (Novo sistema, segue a câmera)
 local flying = false
-local speed = 50
+local speed = 60
 local flyBodyVelocity
 local flyGyro
 
@@ -151,7 +161,7 @@ end)
 local ESPEnabled = false
 local ESPObjects = {}
 
-createButton("ESP", 110, function(active)
+createButton("ESP", 160, function(active)
     ESPEnabled = active
 
     -- Remover ESP quando desativado
@@ -202,4 +212,4 @@ createButton("ESP", 110, function(active)
     end)
 end)
 
-print("[✅] UI Criada! Atravessar Paredes, Voar e ESP corrigidos.")
+print("[✅] UI Criada! Atravessar Paredes, Voar, Anti-Tudo e ESP corrigidos.")
