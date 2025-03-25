@@ -13,39 +13,18 @@ Panel.Position = UDim2.new(0.75, 0, 0.1, 0)
 Panel.Visible = false
 Panel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 
--- Permitir arrastar o painel
-local UIS = game:GetService("UserInputService")
-local dragging, dragInput, dragStart, startPos
-
-Panel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = Panel.Position
-
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-Panel.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement then
-        dragInput = input
-    end
-end)
-
-UIS.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        Panel.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+local CloseButton = Instance.new("TextButton", Panel)
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -30, 0, 0)
+CloseButton.Text = "X"
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 
 FloatingButton.MouseButton1Click:Connect(function()
     Panel.Visible = not Panel.Visible
+end)
+
+CloseButton.MouseButton1Click:Connect(function()
+    Panel.Visible = false
 end)
 
 -- Criando botões e funções
@@ -64,108 +43,115 @@ local function createButton(name, position, action)
     end)
 end
 
--- 🔰 Anti-Tudo
-createButton("Anti-Tudo", 10, function(active)
-    if active then
-        local mt = getrawmetatable(game)
-        setreadonly(mt, false)
-        local oldNamecall = mt.__namecall
-        mt.__namecall = newcclosure(function(self, ...)
-            local method = getnamecallmethod()
-            if method == "Kick" or method == "kick" then return nil end
-            return oldNamecall(self, ...)
-        end)
-
-        local Players = game:GetService("Players")
-        for _, v in pairs(getconnections(Players.LocalPlayer.Idled)) do v:Disable() end
-    end
-end)
-
--- ✈️ Voar (Novo sistema, segue a câmera)
-local flying = false
-local speed = 50
-local flyBodyVelocity
-local flyGyro
-
-createButton("Voar", 60, function(active)
-    local player = game:GetService("Players").LocalPlayer
-    local char = player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-
-    if active and root then
-        flying = true
-        flyBodyVelocity = Instance.new("BodyVelocity", root)
-        flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        flyBodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
-
-        flyGyro = Instance.new("BodyGyro", root)
-        flyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        flyGyro.CFrame = root.CFrame
-
-        game:GetService("RunService").RenderStepped:Connect(function()
-            if not flying then return end
-            local cam = workspace.CurrentCamera
-            flyGyro.CFrame = cam.CFrame
-            flyBodyVelocity.Velocity = cam.CFrame.LookVector * speed
-        end)
-    else
-        flying = false
-        if flyBodyVelocity then flyBodyVelocity:Destroy() end
-        if flyGyro then flyGyro:Destroy() end
-    end
-end)
-
--- 🚪 Atravessar paredes (Corrigido: Agora sempre funciona)
-local atravessarAtivo = false
-
-createButton("Atravessar Paredes", 110, function(active)
+-- 🔰 Atravessar paredes corrigido
+createButton("Atravessar Paredes", 10, function(active)
     local char = game:GetService("Players").LocalPlayer.Character
-    atravessarAtivo = active
+    for _, part in pairs(char:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = not active
+        end
+    end
 
-    game:GetService("RunService").Stepped:Connect(function()
-        if not atravessarAtivo then return end
-        if char then
+    -- Correção para evitar bug de não atravessar depois de um tempo
+    if active then
+        game:GetService("RunService").Stepped:Connect(function()
             for _, part in pairs(char:GetChildren()) do
                 if part:IsA("BasePart") then
                     part.CanCollide = false
                 end
             end
-        end
-    end)
+        end)
+    end
 end)
 
--- 🔍 ESP (Bolinha verde em cima dos jogadores)
-local espAtivo = false
-local players = game:GetService("Players")
+-- ✈️ Voo corrigido
+createButton("Voar", 60, function(active)
+    local player = game:GetService("Players").LocalPlayer
+    local char = player.Character
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
 
-createButton("ESP", 160, function(active)
-    espAtivo = active
+    if active then
+        local fly = Instance.new("BodyVelocity", char.HumanoidRootPart)
+        fly.Velocity = Vector3.new(0, 0, 0)
+        fly.MaxForce = Vector3.new(4000, 4000, 4000)
 
-    for _, player in pairs(players:GetPlayers()) do
-        if player ~= players.LocalPlayer then
-            local char = player.Character
-            if char and char:FindFirstChild("Head") then
-                if active then
-                    local billboard = Instance.new("BillboardGui", char.Head)
-                    billboard.Size = UDim2.new(0, 50, 0, 50)
-                    billboard.Adornee = char.Head
-                    billboard.Name = "ESPTag"
-                    billboard.AlwaysOnTop = true
+        local connection
+        connection = game:GetService("RunService").Stepped:Connect(function()
+            if not active then
+                connection:Disconnect()
+                fly:Destroy()
+                return
+            end
 
-                    local frame = Instance.new("Frame", billboard)
-                    frame.Size = UDim2.new(1, 0, 1, 0)
-                    frame.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-                    frame.BackgroundTransparency = 0.2
-                    frame.BorderSizePixel = 0
-                    frame.Shape = Enum.PartType.Ball
-                else
-                    if char:FindFirstChild("ESPTag") then
-                        char.ESPTag:Destroy()
-                    end
-                end
+            local direction = humanoid.MoveDirection
+            if direction.Magnitude > 0 then
+                fly.Velocity = direction * 50
+            else
+                fly.Velocity = Vector3.new(0, 0, 0)
+            end
+        end)
+    else
+        for _, v in pairs(char.HumanoidRootPart:GetChildren()) do
+            if v:IsA("BodyVelocity") then
+                v:Destroy()
             end
         end
     end
 end)
 
-print("[✅] UI Criada! Agora o voo e o atravessar paredes funcionam sem bugs.")
+-- 👀 ESP corrigido
+local ESPEnabled = false
+local ESPObjects = {}
+
+createButton("ESP", 110, function(active)
+    ESPEnabled = active
+
+    -- Remover ESP quando desativado
+    if not ESPEnabled then
+        for _, obj in pairs(ESPObjects) do
+            obj:Destroy()
+        end
+        ESPObjects = {}
+        return
+    end
+
+    -- Criar ESP
+    local function createESP(player)
+        if player == game.Players.LocalPlayer then return end -- Não adicionar ESP em si mesmo
+
+        local char = player.Character
+        if char then
+            local head = char:FindFirstChild("Head")
+            if head then
+                local esp = Instance.new("BillboardGui", head)
+                esp.Size = UDim2.new(0, 10, 0, 10) -- Tamanho pequeno da bolinha
+                esp.Adornee = head
+                esp.AlwaysOnTop = true
+
+                local dot = Instance.new("Frame", esp)
+                dot.Size = UDim2.new(1, 0, 1, 0)
+                dot.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                dot.BackgroundTransparency = 0
+                dot.BorderSizePixel = 0
+
+                ESPObjects[player] = esp
+            end
+        end
+    end
+
+    -- Ativar ESP para jogadores existentes
+    for _, player in pairs(game.Players:GetPlayers()) do
+        createESP(player)
+    end
+
+    -- Atualizar ESP para novos jogadores
+    game.Players.PlayerAdded:Connect(createESP)
+    game.Players.PlayerRemoving:Connect(function(player)
+        if ESPObjects[player] then
+            ESPObjects[player]:Destroy()
+            ESPObjects[player] = nil
+        end
+    end)
+end)
+
+print("[✅] UI Criada! Atravessar Paredes, Voar e ESP corrigidos.")
